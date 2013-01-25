@@ -1,12 +1,12 @@
 # Votifier
 
-Votifier is a Bukkit plugin whose purpose is to be notified (aka *votified*) when a vote is made on a Minecraft server top list for the server.  Votifier creates a *lightweight* server that waits for connections by Minecraft server lists and uses a simple protocol to get the required information.  Votifier is *secure*, and makes sure that all vote notifications are delivered by authentic top lists.
+Votifier is a Forge plugin whose purpose is to be notified (aka *votified*) when a vote is made on a Minecraft server top list for the server.  Votifier creates a *lightweight* server that waits for connections by Minecraft server lists and uses a simple protocol to get the required information.  Votifier is *secure*, and makes sure that all vote notifications are delivered by authentic top lists.
 
 ## Configuring Votifier
 
 Votifier configures itself the first time it is run.
 
-If you want to customize Votifier, simply the edit `./plugins/votifier/config.yml` file.
+If you want to customize Votifier, simply the edit `./config/Votifier/config.properties` file.
 
 ## Writing Vote Listeners
 

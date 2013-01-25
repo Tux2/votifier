@@ -27,7 +27,10 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.logging.*;
 import javax.crypto.BadPaddingException;
-import org.bukkit.Bukkit;
+
+import net.minecraft.server.MinecraftServer;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.ForgeEventFactory;
 
 import com.vexsoftware.votifier.Votifier;
 import com.vexsoftware.votifier.crypto.RSA;
@@ -42,7 +45,7 @@ import com.vexsoftware.votifier.model.*;
 public class VoteReceiver extends Thread {
 
 	/** The logger instance. */
-	private static final Logger LOG = Logger.getLogger("Votifier");
+	private static final Logger LOG = MinecraftServer.logger;
 
 	private final Votifier plugin;
 
@@ -171,17 +174,8 @@ public class VoteReceiver extends Thread {
 										+ vlName + "' listener", ex);
 					}
 				}
-
-				// Call event in a synchronized fashion to ensure that the
-				// custom event runs in the
-				// the main server thread, not this one.
-				plugin.getServer().getScheduler()
-						.scheduleSyncDelayedTask(plugin, new Runnable() {
-							public void run() {
-								Bukkit.getServer().getPluginManager()
-										.callEvent(new VotifierEvent(vote));
-							}
-						});
+				
+				MinecraftForge.EVENT_BUS.post(new VotifierEvent(vote));
 
 				// Clean up.
 				writer.close();

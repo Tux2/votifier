@@ -23,14 +23,24 @@ import java.security.KeyPair;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.*;
-import org.bukkit.Bukkit;
-import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.plugin.java.JavaPlugin;
+
+import net.minecraft.server.MinecraftServer;
+
 import com.vexsoftware.votifier.crypto.RSAIO;
 import com.vexsoftware.votifier.crypto.RSAKeygen;
 import com.vexsoftware.votifier.model.ListenerLoader;
 import com.vexsoftware.votifier.model.VoteListener;
 import com.vexsoftware.votifier.net.VoteReceiver;
+
+import cpw.mods.fml.common.Mod;
+import cpw.mods.fml.common.Mod.Init;
+import cpw.mods.fml.common.Mod.PreInit;
+import cpw.mods.fml.common.Mod.ServerStarted;
+import cpw.mods.fml.common.Mod.ServerStopping;
+import cpw.mods.fml.common.event.FMLInitializationEvent;
+import cpw.mods.fml.common.event.FMLPreInitializationEvent;
+import cpw.mods.fml.common.event.FMLServerStartedEvent;
+import cpw.mods.fml.common.event.FMLServerStoppingEvent;
 
 /**
  * The main Votifier plugin class.
@@ -38,10 +48,13 @@ import com.vexsoftware.votifier.net.VoteReceiver;
  * @author Blake Beaupain
  * @author Kramer Campbell
  */
-public class Votifier extends JavaPlugin {
+@Mod(modid="Votifier", name="Votifier", version="1.9.0")
+public class Votifier {
 
+	private VotifierConfig cfg;
+	
 	/** The logger instance. */
-	private static final Logger LOG = Logger.getLogger("Votifier");
+	private static final Logger LOG = MinecraftServer.logger;
 
 	/** Log entry prefix */
 	private static final String logPrefix = "[Votifier] ";
@@ -50,7 +63,7 @@ public class Votifier extends JavaPlugin {
 	private static Votifier instance;
 
 	/** The current Votifier version. */
-	private String version;
+	private String version = "1.9.0";
 
 	/** The vote listeners. */
 	private final List<VoteListener> listeners = new ArrayList<VoteListener>();
@@ -63,53 +76,41 @@ public class Votifier extends JavaPlugin {
 
 	/** Debug mode flag */
 	private boolean debug;
-
-	/**
-	 * Attach custom log filter to logger.
-	 */
-	static {
-		LOG.setFilter(new LogFilter(logPrefix));
-	}
-
-	@Override
-	public void onEnable() {
+	
+	private File datafolder = new File("config" + File.separator + "Votifier");
+	
+	@PreInit
+	public void preInit(FMLPreInitializationEvent event) {
+		LOG.info("[Votifier] Loading Votifier");
 		Votifier.instance = this;
-
-		// Set the plugin version.
-		version = getDescription().getVersion();
 
 		// Handle configuration.
 		if (!getDataFolder().exists()) {
 			getDataFolder().mkdir();
 		}
-		File config = new File(getDataFolder() + "/config.yml");
-		YamlConfiguration cfg = YamlConfiguration.loadConfiguration(config);
-		File rsaDirectory = new File(getDataFolder() + "/rsa");
-		// Replace to remove a bug with Windows paths - SmilingDevil
-		String listenerDirectory = getDataFolder().toString()
-				.replace("\\", "/") + "/listeners";
-
+		File config = new File(getDataFolder().getAbsolutePath());
+		cfg = new VotifierConfig(config);
+		File rsaDirectory = new File(getDataFolder() + File.separator + "rsa");
+		String listenerDirectory = getDataFolder().toString() + File.separator + "listeners";
 		/*
 		 * Use IP address from server.properties as a default for
 		 * configurations. Do not use InetAddress.getLocalHost() as it most
 		 * likely will return the main server address instead of the address
 		 * assigned to the server.
 		 */
-		String hostAddr = Bukkit.getServer().getIp();
+		String hostAddr = MinecraftServer.getServer().getHostname();
 		if (hostAddr == null || hostAddr.length() == 0)
 			hostAddr = "0.0.0.0";
 
 		/*
 		 * Create configuration file if it does not exists; otherwise, load it
 		 */
-		if (!config.exists()) {
+		if (cfg.getString("port","").equals("")) {
 			try {
 				// First time run - do some initialization.
 				LOG.info("Configuring Votifier for the first time...");
 
 				// Initialize the configuration file.
-				config.createNewFile();
-
 				cfg.set("host", hostAddr);
 				cfg.set("port", 8192);
 				cfg.set("debug", false);
@@ -126,15 +127,12 @@ public class Votifier extends JavaPlugin {
 				LOG.info("------------------------------------------------------------------------------");
 
 				cfg.set("listener_folder", listenerDirectory);
-				cfg.save(config);
+				cfg.save();
 			} catch (Exception ex) {
 				LOG.log(Level.SEVERE, "Error creating configuration file", ex);
 				gracefulExit();
 				return;
 			}
-		} else {
-			// Load configuration.
-			cfg = YamlConfiguration.loadConfiguration(config);
 		}
 
 		/*
@@ -156,18 +154,31 @@ public class Votifier extends JavaPlugin {
 			gracefulExit();
 			return;
 		}
+	}
+
+	@Init
+	public void onEnable(FMLInitializationEvent event) {
+
+		LOG.info("[Votifier] Loading vote listeners");
+		String listenerDirectory = getDataFolder().toString() + File.separator + "listeners";
 
 		// Load the vote listeners.
 		listenerDirectory = cfg.getString("listener_folder");
 		listeners.addAll(ListenerLoader.load(listenerDirectory));
 
+	}
+	
+	@ServerStarted
+	public void serverStarted(FMLServerStartedEvent event) {
 		// Initialize the receiver.
-		String host = cfg.getString("host", hostAddr);
+		String host = cfg.getString("host");
 		int port = cfg.getInt("port", 8192);
+		LOG.info("[Votifier] Starting listener on port " + port);
 		debug = cfg.getBoolean("debug", false);
-		if (debug)
+		if (debug) {
 			LOG.info("DEBUG mode enabled!");
-
+		}
+		
 		try {
 			voteReceiver = new VoteReceiver(this, host, port);
 			voteReceiver.start();
@@ -177,10 +188,11 @@ public class Votifier extends JavaPlugin {
 			gracefulExit();
 			return;
 		}
+		
 	}
 
-	@Override
-	public void onDisable() {
+	@ServerStopping
+	public void serverStopped(FMLServerStoppingEvent event) {
 		// Interrupt the vote receiver.
 		if (voteReceiver != null) {
 			voteReceiver.shutdown();
@@ -239,6 +251,10 @@ public class Votifier extends JavaPlugin {
 
 	public boolean isDebug() {
 		return debug;
+	}
+
+	public File getDataFolder() {
+		return datafolder;
 	}
 
 }
