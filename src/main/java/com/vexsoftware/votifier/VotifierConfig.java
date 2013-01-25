@@ -26,7 +26,7 @@ public class VotifierConfig {
 				iniSettings.load(new FileInputStream(INIFILE));
 
 			}catch (Exception e) {
-				MinecraftServer.logger.info("[EnjinMinecraftPlugin] - properties file load failed, using defaults.");
+				MinecraftServer.logger.info("[Votifier] - properties file load failed, using defaults.");
 			}		
 		}else {
 			createIni();
@@ -40,7 +40,7 @@ public class VotifierConfig {
 			INIFILE.createNewFile();
 			iniSettings.load(new FileInputStream(INIFILE));
 		} catch (Exception e) {
-			MinecraftServer.logger.info("[EnjinMinecraftPlugin] - properties file creation failed, using defaults.");
+			MinecraftServer.logger.info("[Votifier] - properties file creation failed, using defaults.");
 		}
 
 	}
